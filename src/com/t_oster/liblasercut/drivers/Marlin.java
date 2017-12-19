@@ -235,7 +235,7 @@ public class Marlin extends GenericGcodeDriver {
        
     //move to start of image with overscan
     Point lineStart = rp.getStartPosition(rp.getRasterHeight()-1);
-    int overscan = Math.round((float)Util.mm2px(this.getRasterPadding() * (rp.cutDirectionleftToRight ? 1 : -1), resolution));
+    int overscan = Math.round((float)Util.mm2px(this.getRasterPadding(), resolution));
     move(out,lineStart.x + rp.cutCompensation() - overscan, lineStart.y,resolution);
     sendLine("G0 F%f",(rp.getPowerSpeedFocusPropertyForColor(0).getSpeed()*max_speed)/100);
  
@@ -450,7 +450,7 @@ public class Marlin extends GenericGcodeDriver {
     pl.progressChanged(this, 100);
   }
   @Override
-  public void saveJob(java.io.PrintStream fileOutputStream, LaserJob job) throws IllegalJobException, Exception {
+  public void saveJob(java.io.PrintStream fileOutputStream, LaserJob job,ProgressListener pl) throws IllegalJobException, Exception {
     this.currentPower = -1;
     this.currentSpeed = -1;
 

@@ -542,7 +542,7 @@ public class Lasersaur extends LaserCutter {
   }
 
   @Override
-  public void saveJob(PrintStream fileOutputStream, LaserJob job) throws UnsupportedOperationException, IllegalJobException, Exception {
+  public void saveJob(PrintStream fileOutputStream, LaserJob job,ProgressListener pl) throws UnsupportedOperationException, IllegalJobException, Exception {
       writeJob(new BufferedOutputStream(fileOutputStream), job, null, null);
   }
 }

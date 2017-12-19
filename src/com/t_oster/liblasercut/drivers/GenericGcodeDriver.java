@@ -494,7 +494,7 @@ public class GenericGcodeDriver extends LaserCutter {
     sendLine("G1 X%f Y%f"+append, x, y);
   }
 
-  private void writeInitializationCode() throws IOException {
+  protected void writeInitializationCode() throws IOException {
     if (preJobGcode != null)
     {
       for (String line : preJobGcode.split(","))
@@ -505,7 +505,7 @@ public class GenericGcodeDriver extends LaserCutter {
   }
 
 
-  private void writeShutdownCode() throws IOException {
+  protected void writeShutdownCode() throws IOException {
     if (postJobGcode != null)
     {
       for (String line : postJobGcode.split(","))
@@ -665,7 +665,7 @@ public class GenericGcodeDriver extends LaserCutter {
    * Used to buffer the file before uploading via http
    */
   private ByteArrayOutputStream outputBuffer;
-  private String jobName;
+  String jobName;
   protected void connect(ProgressListener pl) throws IOException, PortInUseException, NoSuchPortException, UnsupportedCommOperationException
   {
     outputBuffer = null;
@@ -831,18 +831,22 @@ public class GenericGcodeDriver extends LaserCutter {
   }
 
 @Override
-public void saveJob(java.io.PrintStream fileOutputStream, LaserJob job) throws IllegalJobException, Exception {
+public void saveJob(java.io.PrintStream fileOutputStream, LaserJob job,ProgressListener pl) throws IllegalJobException, Exception {
   this.currentPower = -1;
   this.currentSpeed = -1;
 
+  pl.taskChanged(this, "checking job");
 	checkJob(job);
 
 	this.out = fileOutputStream;
 
 	boolean wasSetWaitingForOk = isWaitForOKafterEachLine();
 	setWaitForOKafterEachLine( false );
-
+  pl.taskChanged(this, "saving");
 	writeInitializationCode();
+  pl.progressChanged(this, 20);
+  int max = job.getParts().size();
+  int i = 0;
 	for (JobPart p : job.getParts())
 	{
 		if (p instanceof Raster3dPart || p instanceof RasterPart)
@@ -853,10 +857,15 @@ public void saveJob(java.io.PrintStream fileOutputStream, LaserJob job) throws I
 		{
 			writeVectorGCode((VectorPart) p, p.getDPI());
 		}
+    i++;
+    pl.progressChanged(this, 20 + (int) (i*(double) 60/max));
 	}
 	writeShutdownCode();
 	this.out.flush();
 
+   pl.taskChanged(this, "saved.");
+   pl.progressChanged(this, 100);
+    
 	setWaitForOKafterEachLine(wasSetWaitingForOk);
 }
 

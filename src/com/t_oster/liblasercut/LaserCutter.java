@@ -82,7 +82,7 @@ public abstract class LaserCutter implements Cloneable, Customizable {
      */
     public abstract void sendJob(LaserJob job, ProgressListener pl, List<String> warnings) throws IllegalJobException, Exception;
 
-    public void saveJob(PrintStream fileOutputStream, LaserJob job) throws UnsupportedOperationException, IllegalJobException, Exception {
+    public void saveJob(PrintStream fileOutputStream, LaserJob job,ProgressListener pl) throws UnsupportedOperationException, IllegalJobException, Exception {
         System.err.println("Your driver does not implement saveJob(LaserJob job)");
         throw new UnsupportedOperationException("Your driver does not implement saveJob(LaserJob job)");
     }
