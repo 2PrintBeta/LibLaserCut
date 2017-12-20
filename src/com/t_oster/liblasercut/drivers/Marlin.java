@@ -99,7 +99,6 @@ public class Marlin extends GenericGcodeDriver {
     result.remove(GenericGcodeDriver.SETTING_BLANK_LASER_DURING_RAPIDS);
     result.add(SETTING_RASTER_G7);
     result.add(SETTING_OPTIMISE_RASTER); 
-    result.add(SETTING_SANATISE_PRONTERFACE);
     return result.toArray(new String[0]);
   }
   
@@ -112,9 +111,6 @@ public class Marlin extends GenericGcodeDriver {
     if (SETTING_OPTIMISE_RASTER.equals(attribute)) {
       return this.getOptimiseRastering();
     }
-    if (SETTING_SANATISE_PRONTERFACE.equals(attribute)) {
-      return this.getSanatisePronterface();
-    }
     
     return super.getProperty(attribute);
   }
@@ -126,9 +122,6 @@ public class Marlin extends GenericGcodeDriver {
     }
     if (SETTING_OPTIMISE_RASTER.equals(attribute)) {
       this.setOptimiseRastering((Boolean) value);
-    }
-    if (SETTING_SANATISE_PRONTERFACE.equals(attribute)) {
-      this.setSanatisePronterface((Boolean) value);
     }
     super.setProperty(attribute, value);
   }
@@ -180,17 +173,6 @@ public class Marlin extends GenericGcodeDriver {
   public void setOptimiseRastering(boolean setting)
   {
     this.optimiseRastering = setting;
-  }
-
-  protected boolean sanatisePronterface = false;
-  public boolean getSanatisePronterface()
-  {
-    return sanatisePronterface;
-  }
-
-  public void setSanatisePronterface(boolean setting)
-  {
-    this.sanatisePronterface = setting;
   }
   
   @Override
@@ -334,14 +316,14 @@ public class Marlin extends GenericGcodeDriver {
         {
           for(int x=start; x<end;x++)
           {
-            data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*255) );
+            data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*254) );
           }
         }
         else
         {
           for(int x=end-1;x>=start;x--)
           {
-             data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*100) );
+             data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*254) );
           }
         }
         
@@ -368,19 +350,18 @@ public class Marlin extends GenericGcodeDriver {
             else
               gcode += ("G7 $0 ");
             first = !first;
+          }
+          else
+            gcode +=  ("G7 ");
+          //encode the whole chunk as base64
+          String b64 = new String(Base64.getEncoder().encode(chunk));
+          //String b64 = base64.b64encode("".join(chr(y) for y in chunk))
+          gcode += ("L"+Integer.toString(b64.length())+" ");
+          gcode += ("D"+b64);
+          sendLine(gcode);
+          
+             
         }
-        else
-          gcode +=  ("G7 ");
-        //encode the whole chunk as base64
-        String b64 = new String(Base64.getEncoder().encode(chunk));
-        //String b64 = base64.b64encode("".join(chr(y) for y in chunk))
-        //If we're using pronterface, we need to change raster data / and + in the base64 alphabet to letter 9. This loses a little intensity in pure blacks but keeps pronterface happy.
-        if(this.sanatisePronterface)
-          b64 = b64.replace("+", "9").replace("/", "9");
-        gcode += ("L"+Integer.toString(b64.length())+" ");
-        gcode += ("D"+b64);
-        sendLine(gcode);
-      }
           
         forward = !forward;
         //rp.toggleRasteringCutDirection();
