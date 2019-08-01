@@ -212,168 +212,102 @@ public class Marlin extends GenericGcodeDriver {
   protected void writeRasterGCode(RasterizableJobPart rp, double resolution, boolean bidirectional) throws UnsupportedEncodingException, IOException {
      
     //setup laser config for this part
-    sendLine(";Beginning of Raster Image. Pixel size: %dx%d",rp.getRasterWidth(),rp.getRasterHeight());
-    sendLine("M649 S%f B2 D0 R%f",rp.getPowerSpeedFocusPropertyForColor(0).getPower(),1/(resolution / 25.4));
-       
-    //move to start of image with overscan
-    Point lineStart = rp.getStartPosition(rp.getRasterHeight()-1);
-    int overscan = Math.round((float)Util.mm2px(this.getRasterPadding(), resolution));
-    move(out,lineStart.x + rp.cutCompensation() - overscan, lineStart.y,resolution);
-    sendLine("G0 F%f",(rp.getPowerSpeedFocusPropertyForColor(0).getSpeed()*max_speed)/100);
- 
+    double pixel_size = 1/(resolution / 25.4);
+    sendLine(";Beginning of Raster Image. Image size: %dx%d",rp.getRasterWidth(),rp.getRasterHeight());
+    sendLine("M649 S%f B2 D0 R%f",rp.getPowerSpeedFocusPropertyForColor(0).getPower(),pixel_size);
+    currentPower = rp.getPowerSpeedFocusPropertyForColor(0).getPower();
+      
     //prepare overscan array
+    int overscan = Math.round((float)Util.mm2px(this.getRasterPadding(), resolution));
     ArrayList<Byte> overscanArray = new ArrayList<Byte>();
     for (int i=0; i<overscan; i++){
       overscanArray.add((byte) rp.getPowerSpeedFocusPropertyForColor(255).getPower());
     }
-      
-    int previousRight = 999999999;
-    int previousLeft  = 0;
-    boolean firstRow = true;
-    boolean first = true; 
+    
+    //iterate over all raster lines
     boolean forward = true;
-    
-    
-    //iterate tthough the lines
     for (int y = rp.getRasterHeight()-1; y >= 0; y--)
     {
-        int splitRight = 0;
-        int splitLeft = 0;
+       //skip line if it is empty
+       if(rp.lineIsBlank(y)) continue;
+       
+       //find start and end of line
+       int start = rp.firstNonWhitePixel(y);
+       int end = rp.lastNonWhitePixel(y);
+       Point lineStart = rp.getStartPosition(y);
+       
+       // go to start position
+       if(forward)  move(out,lineStart.x + start - overscan,lineStart.y,resolution);
+       else  move(out,lineStart.x + start+ overscan,lineStart.y,resolution);
       
-        //The below allows iteration over blank lines, while still being 'mostly' optimised for path. could still do with a little improvement for optimising horizontal movement and extrenuous for loops.
-        int sub_index = y-1;
-        if(sub_index >= 0)
-        {
-            while(rp.lineIsBlank(sub_index+1))
-            {
-                if(sub_index > 0)
-                    sub_index-= 1;
-                else
-                    break;
-            }
-        }
+       //set speed
+       sendLine("G0 F%f",(rp.getPowerSpeedFocusPropertyForColor(0).getSpeed()*max_speed)/100);
+  
+       //prepare data for line
+       ArrayList<Byte> data = new ArrayList<Byte>();
         
-        //#are we processing data before the last line?    
-        if(sub_index >= 0)
-        {
-            // Determine where to split the lines.
-            //  ##################################################
-                
-            //If the left most pixel of the next row is earlier than the current row, then extend.
-            if(rp.firstNonWhitePixel(sub_index) > rp.firstNonWhitePixel(y))
-                splitLeft = rp.firstNonWhitePixel(y);
-            else
-              splitLeft = rp.firstNonWhitePixel(sub_index);
-            //If the end pixel of the next line is later than the current line, extend.
-            if(rp.lastNonWhitePixel(sub_index) > rp.lastNonWhitePixel(y))
-                splitRight = rp.lastNonWhitePixel(sub_index);
-            else
-                splitRight = rp.lastNonWhitePixel(y);
-        }      
-        else
-        {
-            splitLeft  = rp.firstNonWhitePixel(y);
-            splitRight = rp.lastNonWhitePixel(y);
-        }
-      
-        //Positive direction
-        if(forward)                
-        {
-          //Don't split more than the start of the last row as we print in reverse for alternate lines
-            splitLeft = previousLeft;
-            previousRight = splitRight;
-        }    
-        else //#Negative direction
-        {
-            //Don't split more than the end of the last row as we print in reverse for alternate lines
-            splitRight = previousRight;
-            previousLeft = splitLeft;
-        }      
-        //Exception to the rule : Don't split the left of the first row.
-        if(firstRow)
-            splitLeft = (previousLeft);
-        
-        //all the above is for line optimisation
-        //the current line should be chopped from splitLeft+1 to splitRight+1 and only this data 
-        // should be used in the following code.
-        //FOR NOW: use full line
-        
-        firstRow = false;
-        
-        int start=0;
-        int end=rp.getRasterWidth();
-        if(this.optimiseRastering)
-        {
-          start=splitLeft;
-          end = splitRight;
-        }
-        
-        //get the line of data
-        // if we are not going forward, invert  the data  
-        ArrayList<Byte> data = new ArrayList<Byte>();
-        
-        if(forward)
-        {
+       if(forward)
+       {
           for(int x=start; x<end;x++)
-          {
-            data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*254) );
-          }
-        }
-        else
-        {
-          for(int x=end-1;x>=start;x--)
           {
              data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*254) );
           }
-        }
-        
-        //prepend and append overscan array
-        data.addAll(0, overscanArray);
-        data.addAll(overscanArray);    
-        
-        //split the data in chunks
-        byte[] dataArray = new byte[data.size()];
-        for(int i = 0; i < data.size(); i++) {
-            dataArray[i] = data.get(i);
-        }
-        byte chunks[][] = splitBytes(dataArray,51);
-        
-        //for chunk in get_chunks(result_row,51):
-        first = true;
-        for (byte[] chunk : chunks)
-        {
-          String gcode = "";
-          if (first)
+       }
+       else
+       {
+          for(int x=start-1;x>=end;x--)
           {
-            if(forward)
-              gcode += ("G7 $1 ");
-            else
-              gcode += ("G7 $0 ");
-            first = !first;
+             data.add((byte) Math.round(rp.getPowerSpeedFocusPropertyForPixel(x, y).getPower()/rp.getPowerSpeedFocusPropertyForColor(0).getPower()*254) );
           }
-          else
+       }
+        
+       //prepend and append overscan array
+       data.addAll(0, overscanArray);
+       data.addAll(overscanArray);    
+
+       //split the data in chunks
+       byte[] dataArray = new byte[data.size()];
+       for(int i = 0; i < data.size(); i++) {
+           dataArray[i] = data.get(i);
+       }
+       byte chunks[][] = splitBytes(dataArray,51);
+        
+       //for chunk in get_chunks(result_row,51):
+       boolean first = true;
+       for (byte[] chunk : chunks)
+       {
+         String gcode = "";
+         if (first)
+         {
+            if(forward) gcode += ("G7 $1 ");
+            else gcode += ("G7 $0 ");
+            first = !first;
+         }
+         else
             gcode +=  ("G7 ");
-          //encode the whole chunk as base64
-          String b64 = new String(Base64.getEncoder().encode(chunk));
-          //String b64 = base64.b64encode("".join(chr(y) for y in chunk))
-          gcode += ("L"+Integer.toString(b64.length())+" ");
-          gcode += ("D"+b64);
-          sendLine(gcode);
-          
-             
-        }
-          
+         
+         //encode the whole chunk as base64
+         String b64 = new String(Base64.getEncoder().encode(chunk));
+         //String b64 = base64.b64encode("".join(chr(y) for y in chunk))
+         gcode += ("L"+Integer.toString(b64.length())+" ");
+         gcode += ("D"+b64);
+         sendLine(gcode);
+              
+       }
+       
+       //toggle direction if wanted
+       if( this.useBidirectionalRastering)
+       {
+        rp.toggleRasteringCutDirection();
         forward = !forward;
-        //rp.toggleRasteringCutDirection();
-      }
-    
-    
+       }
+    }
     
      sendLine("M5");
      sendLine("M649 S%f B0 D0 R%f",rp.getPowerSpeedFocusPropertyForColor(0).getPower(),1/(resolution / 25.4));
      sendLine(";End of Raster Image.");
-    
-  
+     sendLine("G28 XY");
+
   }
    
   

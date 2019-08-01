@@ -35,7 +35,8 @@ public class BlackWhiteRaster extends TimeIntensiveOperation implements Greyscal
     ORDERED,
     GRID,
     HALFTONE,
-    BRIGHTENED_HALFTONE
+    BRIGHTENED_HALFTONE,
+    NONE
   }
   private int width;
   private int height;
@@ -59,6 +60,8 @@ public class BlackWhiteRaster extends TimeIntensiveOperation implements Greyscal
         return new Halftone();
       case BRIGHTENED_HALFTONE:
         return new BrightenedHalftone();
+      case NONE:
+        return new None();
       default:
         throw new IllegalArgumentException("Desired Dithering Algorithm ("+alg+") does not exist");
     }
