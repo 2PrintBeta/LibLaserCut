@@ -20,7 +20,7 @@ package com.t_oster.liblasercut.vectoroptimizers;
 
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,7 +39,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
      * order ascending by this integer
      * inside objects should have the lowest values
      */
-    abstract int getValue(Element e);
+    abstract double getValue(Element e);
 
     /**
      * compare by getValue()
@@ -47,8 +47,8 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
     @Override
     public int compare(Element a, Element b)
     {
-      Integer av = new Integer(getValue(a));
-      Integer bv = new Integer(getValue(b));
+      Double av = new Double(getValue(a));
+      Double bv = new Double(getValue(b));
       return av.compareTo(bv);
     }
   }
@@ -57,7 +57,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
   {
     // compare by XMin a>b
     @Override
-    int getValue(Element e)
+    double getValue(Element e)
     {
       return -e.boundingBox().getXMin();
     }
@@ -67,7 +67,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
   {
     // compare by YMin a>b
     @Override
-    int getValue(Element e)
+    double getValue(Element e)
     {
       return -e.boundingBox().getYMin();
     }
@@ -77,7 +77,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
   {
     // compare by XMax a<b
     @Override
-    int getValue(Element e)
+    double getValue(Element e)
     {
       return e.boundingBox().getXMax();
     }
@@ -87,7 +87,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
   {
     // compare by YMax a<b
     @Override
-    int getValue(Element e)
+    double getValue(Element e)
     {
       return e.boundingBox().getYMax();
     }
@@ -96,11 +96,11 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
   @Override
   protected List<Element> sort(List<Element> e)
   {
-    List<Element> result = new LinkedList<Element>();
     if (e.isEmpty())
     {
-      return result;
+      return e;
     }
+
     /**
      * cut inside parts first, outside parts later
      * this algorithm is very robust, it works even for unconnected paths that
@@ -108,10 +108,6 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
      * it is not completely perfect, as it only considers the bounding-box and
      * not the individual path
      *
-     * see below for documentation of the inner workings
-     */
-    result.addAll(e);
-    /**
      * HEURISTIC:
      * this algorithm is based on the following observation:
      * let I and O be rectangles, I inside O
@@ -180,6 +176,7 @@ public class InnerFirstVectorOptimizer extends VectorOptimizer
      * Element.isClosedPath()
      */
     // do the work:
+    ArrayList<Element> result = OptimizerUtils.joinContiguousLoopElements(e);
     Collections.sort(result, new XMinComparator());
     Collections.sort(result, new YMinComparator());
     Collections.sort(result, new XMaxComparator());
