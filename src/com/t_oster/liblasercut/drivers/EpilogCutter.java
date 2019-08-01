@@ -1014,7 +1014,8 @@ abstract class EpilogCutter extends LaserCutter
 
   @Override
   public void saveJob(PrintStream fileOutputStream, LaserJob job,ProgressListener pl) throws UnsupportedOperationException, IllegalJobException, Exception {
-    job.applyStartPoint();
+    checkJobAndApplyStartPoint(job, new LinkedList<String>());
+   
     byte[] pjlData = generatePjlData(job);
     fileOutputStream.write(pjlData);
   }
